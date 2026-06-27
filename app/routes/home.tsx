@@ -2,10 +2,9 @@ import type { Route } from "./+types/home";
 import { ArrowRight, ArrowUpRight, Clock, Layers } from "lucide-react";
 import Button from "../../componets/ui/button";
 import Upload from "../../componets/Upload";
-import { useNavigate } from "react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createProject, getProjects } from "../../lib/puter.action";
-import { FEATURED_PROJECTS } from "../../lib/featured-projects";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -20,16 +19,18 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Home() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [projects, setProjects] = useState<DesignItem[]>([]);
+    const [isLoadingProjects, setIsLoadingProjects] = useState(true);
     const isCreatingProjectRef = useRef(false);
 
-    const displayProjects = useMemo(() => {
-        const userIds = new Set(projects.map((project) => project.id));
-        const featured = FEATURED_PROJECTS.filter(
-            (project) => !userIds.has(project.id),
-        );
-        return [...projects, ...featured];
-    }, [projects]);
+    const loadProjects = useCallback(async () => {
+        setIsLoadingProjects(true);
+        const items = await getProjects();
+        const sorted = [...items].sort((a, b) => b.timestamp - a.timestamp);
+        setProjects(sorted);
+        setIsLoadingProjects(false);
+    }, []);
 
     const handleUploadComplete = async (base64Image: string) => {
         try {
@@ -53,13 +54,11 @@ export default function Home() {
                 return false;
             }
 
-            setProjects((prev) => [saved, ...prev]);
-
-            navigate(`/visualizer/${newId}`, {
+            navigate(`/visualizer/${saved.id}`, {
                 state: {
                     initialImage: saved.sourceImage,
                     initialRendered: saved.renderedImage || null,
-                    name,
+                    name: saved.name,
                 },
             });
 
@@ -70,20 +69,13 @@ export default function Home() {
     };
 
     useEffect(() => {
-        const fetchProjects = async () => {
-            const items = await getProjects();
-            setProjects(items);
-        };
-
-        fetchProjects();
-    }, []);
+        void loadProjects();
+    }, [loadProjects, location.key]);
 
     return (
         <div className="home">
             <section className="hero">
-                <div className="announce">
-                    
-                </div>
+                <div className="announce"></div>
 
                 <h1>FourWalls Where Great Spaces Begin with a Thought!</h1>
 
@@ -117,7 +109,6 @@ export default function Home() {
                         </div>
 
                         <Upload onComplete={handleUploadComplete} />
-
                     </div>
                 </div>
             </section>
@@ -126,14 +117,20 @@ export default function Home() {
                 <div className="section-inner">
                     <div className="section-head">
                         <div className="copy">
-                            <h2>Projects</h2>
-                              <p>Your latest work and shared community projects, all in one place.</p>
+                            <h2>Recent Projects</h2>
+                            <p>Your latest rendered designs, saved automatically after each visualization.</p>
                         </div>
                     </div>
 
-                    <div className="projects-grid">
-                        {displayProjects.map(
-                            ({ id, name, renderedImage, sourceImage, timestamp, isFeatured }) => (
+                    {isLoadingProjects ? (
+                        <div className="loading">Loading projects...</div>
+                    ) : projects.length === 0 ? (
+                        <div className="empty">
+                            No projects yet. Upload a floor plan above to create your first render.
+                        </div>
+                    ) : (
+                        <div className="projects-grid">
+                            {projects.map(({ id, name, renderedImage, sourceImage, timestamp }) => (
                                 <article
                                     key={id}
                                     className="project-card group"
@@ -150,12 +147,12 @@ export default function Home() {
                                     <div className="preview">
                                         <img
                                             src={renderedImage || sourceImage}
-                                            alt={name ?? ""}
+                                            alt={name ?? "Project"}
                                             loading="lazy"
                                         />
 
                                         <div className="badge">
-                                            <span>{isFeatured ? "Featured" : "Your work"}</span>
+                                            <span>{renderedImage ? "Rendered" : "Processing"}</span>
                                         </div>
                                     </div>
 
@@ -166,15 +163,9 @@ export default function Home() {
                                             <div className="meta">
                                                 <Clock size={12} />
                                                 <span>
-                                                    {(() => {
-                                                        const date = new Date(timestamp);
-                                                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                        const day = String(date.getDate()).padStart(2, '0');
-                                                        const year = date.getFullYear();
-                                                        return `${month}/${day}/${year}`;
-                                                    })()}
+                                                    {new Date(timestamp).toLocaleDateString()}
                                                 </span>
-                                                <span>{isFeatured ? "4Wall Gallery" : "Saved"}</span>
+                                                <span>Saved</span>
                                             </div>
                                         </div>
 
@@ -183,9 +174,9 @@ export default function Home() {
                                         </div>
                                     </div>
                                 </article>
-                            ),
-                        )}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </section>
         </div>

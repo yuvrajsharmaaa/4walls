@@ -1,23 +1,33 @@
+import { useNavigate, useLocation, useOutletContext, useParams } from "react-router";
 import { useEffect, useRef, useState } from "react";
-import {
-    useLocation,
-    useNavigate,
-    useOutletContext,
-    useParams,
-} from "react-router";
-import { Box, Download, RefreshCcw, X } from "lucide-react";
-import Button from "../../componets/ui/button";
 import { generate3DView } from "../../lib/ai.action";
-import { createProject, getProjectById } from "../../lib/puter.action";
-import { getFeaturedProjectById } from "../../lib/featured-projects";
+import { Box, Download, RefreshCcw, Share2, X } from "lucide-react";
+import Button from "../../componets/ui/button";
+import { createProject, getProjectById, shareProject, unshareProject } from "../../lib/puter.action";
+import { ReactCompareSlider, ReactCompareSliderImage } from "react-compare-slider";
 
-const VisualizerIdRoute = () => {
+const buildProjectFromState = (
+    id: string,
+    state: VisualizerLocationState | null,
+): DesignItem | null => {
+    if (!state?.initialImage) return null;
+
+    return {
+        id,
+        name: state.name ?? `Residence ${id}`,
+        sourceImage: state.initialImage,
+        renderedImage: state.initialRender ?? undefined,
+        timestamp: Date.now(),
+    };
+};
+
+const VisualizerId = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-    const { userId } = useOutletContext<AuthContext>();
-
     const routeState = location.state as VisualizerLocationState | null;
+    const authContext = useOutletContext<AuthContext>();
+    const userId = authContext.userId;
 
     const hasInitialGenerated = useRef(false);
 
@@ -25,7 +35,49 @@ const VisualizerIdRoute = () => {
     const [isProjectLoading, setIsProjectLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [currentImage, setCurrentImage] = useState<string | null>(null);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isClient, setIsClient] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
+
+    const handleShareToggle = async () => {
+        if (!project || !id) return;
+
+        if (!authContext.isSignedIn) {
+            const signedIn = await authContext.signIn();
+            if (!signedIn) {
+                console.warn("User canceled sign in or authentication failed.");
+                return;
+            }
+            const updatedAuth = await authContext.refreshAuth();
+            if (!updatedAuth) return;
+        }
+
+        setIsSharing(true);
+        try {
+            if (project.isPublic) {
+                const res = await unshareProject(project.id);
+                if (res && res.ok) {
+                    setProject(prev => prev ? { ...prev, isPublic: false } : null);
+                } else {
+                    console.error("Failed to unshare project");
+                }
+            } else {
+                const res = await shareProject(project.id);
+                if (res && res.ok) {
+                    setProject(prev => prev ? { ...prev, isPublic: true } : null);
+                } else {
+                    console.error("Failed to share project");
+                }
+            }
+        } catch (error) {
+            console.error("Failed to share/unshare project:", error);
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const handleBack = () => navigate("/");
 
@@ -45,38 +97,32 @@ const VisualizerIdRoute = () => {
 
         try {
             setIsProcessing(true);
-            setErrorMessage(null);
-
             const result = await generate3DView({ sourceImage: item.sourceImage });
 
-            if (!result.renderedImage) {
-                setErrorMessage("AI render did not return an image. Please try again.");
-                return;
-            }
+            if (result.renderedImage) {
+                setCurrentImage(result.renderedImage);
 
-            setCurrentImage(result.renderedImage);
+                const updatedItem: DesignItem = {
+                    ...item,
+                    renderedImage: result.renderedImage,
+                    renderedPath: result.renderedPath,
+                    timestamp: Date.now(),
+                    ownerId: item.ownerId ?? userId ?? null,
+                    isPublic: item.isPublic ?? false,
+                };
 
-            const updatedItem: DesignItem = {
-                ...item,
-                renderedImage: result.renderedImage,
-                renderedPath: result.renderedPath,
-                timestamp: Date.now(),
-                ownerId: item.ownerId ?? userId ?? null,
-                isPublic: item.isPublic ?? false,
-            };
+                const saved = await createProject({
+                    item: updatedItem,
+                    visibility: "private",
+                });
 
-            const saved = await createProject({
-                item: updatedItem,
-                visibility: "private",
-            });
-
-            if (saved) {
-                setProject(saved);
-                setCurrentImage(saved.renderedImage || result.renderedImage);
+                if (saved) {
+                    setProject(saved);
+                    setCurrentImage(saved.renderedImage || result.renderedImage);
+                }
             }
         } catch (error) {
             console.error("Generation failed:", error);
-            setErrorMessage("Failed to generate the 3D visualization.");
         } finally {
             setIsProcessing(false);
         }
@@ -92,23 +138,10 @@ const VisualizerIdRoute = () => {
             }
 
             setIsProjectLoading(true);
-            setErrorMessage(null);
 
             const fetchedProject = await getProjectById({ id });
-            const featuredProject = getFeaturedProjectById(id);
-
-            const resolvedProject: DesignItem | null =
-                fetchedProject ??
-                featuredProject ??
-                (routeState?.initialImage
-                    ? {
-                          id,
-                          name: routeState.name ?? `Residence ${id}`,
-                          sourceImage: routeState.initialImage,
-                          renderedImage: routeState.initialRender ?? undefined,
-                          timestamp: Date.now(),
-                      }
-                    : null);
+            const resolvedProject =
+                fetchedProject ?? buildProjectFromState(id, routeState);
 
             if (!isMounted) return;
 
@@ -140,12 +173,6 @@ const VisualizerIdRoute = () => {
             return;
         }
 
-        if (project.isFeatured) {
-            setCurrentImage(project.sourceImage);
-            hasInitialGenerated.current = true;
-            return;
-        }
-
         hasInitialGenerated.current = true;
         void runGeneration(project);
     }, [project, isProjectLoading]);
@@ -159,52 +186,38 @@ const VisualizerIdRoute = () => {
                     <Box className="logo" />
                     <span className="name">4Wall</span>
                 </div>
-
                 <Button variant="ghost" size="sm" onClick={handleBack} className="exit">
-                    <X className="icon" />
-                    Exit Editor
+                    <X className="icon" /> Exit Editor
                 </Button>
             </nav>
 
-            <div className="content">
+            <section className="content">
                 <div className="panel">
                     <div className="panel-header">
                         <div className="panel-meta">
                             <p>Project</p>
                             <h2>{projectName}</h2>
-                            <p className="note">
-                                {project?.isFeatured
-                                    ? "Featured gallery render"
-                                    : "Created by you"}
-                            </p>
+                            <p className="note">Created by you • {project?.isPublic ? "Shared (Public)" : "Private"}</p>
                         </div>
 
                         <div className="panel-actions">
                             <Button
-                                variant="outline"
                                 size="sm"
-                                className="export"
                                 onClick={handleExport}
+                                className="export"
                                 disabled={!currentImage}
                             >
-                                <Download className="w-4 h-4 mr-2" />
-                                Export
+                                <Download className="w-4 h-4 mr-2" /> Export
                             </Button>
-
-                            {!project?.isFeatured && project?.sourceImage && (
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => {
-                                        hasInitialGenerated.current = false;
-                                        void runGeneration(project);
-                                    }}
-                                    disabled={isProcessing}
-                                >
-                                    <RefreshCcw className="w-4 h-4 mr-2" />
-                                    Regenerate
-                                </Button>
-                            )}
+                            <Button
+                                size="sm"
+                                onClick={handleShareToggle}
+                                className={`share ${project?.isPublic ? "is-public bg-zinc-800 text-white" : ""}`}
+                                disabled={isSharing}
+                            >
+                                <Share2 className="w-4 h-4 mr-2" />
+                                {isSharing ? "Processing..." : project?.isPublic ? "Unshare" : "Share"}
+                            </Button>
                         </div>
                     </div>
 
@@ -214,20 +227,16 @@ const VisualizerIdRoute = () => {
                                 Loading project...
                             </div>
                         ) : currentImage ? (
-                            <img
-                                src={currentImage}
-                                alt={projectName}
-                                className="render-img min-h-105"
-                            />
-                        ) : project?.sourceImage ? (
-                            <img
-                                src={project.sourceImage}
-                                alt={projectName}
-                                className="render-fallback min-h-105"
-                            />
+                            <img src={currentImage} alt="AI Render" className="render-img" />
                         ) : (
-                            <div className="render-placeholder min-h-105 flex items-center justify-center text-sm text-zinc-500">
-                                Project not found.
+                            <div className="render-placeholder">
+                                {project?.sourceImage && (
+                                    <img
+                                        src={project.sourceImage}
+                                        alt="Original"
+                                        className="render-fallback"
+                                    />
+                                )}
                             </div>
                         )}
 
@@ -235,48 +244,61 @@ const VisualizerIdRoute = () => {
                             <div className="render-overlay">
                                 <div className="rendering-card">
                                     <RefreshCcw className="spinner" />
-                                    <p className="title">Rendering...</p>
-                                    <p className="subtitle">
+                                    <span className="title">Rendering...</span>
+                                    <span className="subtitle">
                                         Generating your 3D visualization
-                                    </p>
+                                    </span>
                                 </div>
                             </div>
                         )}
                     </div>
-
-                    {errorMessage && (
-                        <div className="px-5 py-4 border-t border-zinc-100 text-sm text-red-600">
-                            {errorMessage}
-                        </div>
-                    )}
                 </div>
 
-                {project?.sourceImage && currentImage && project.sourceImage !== currentImage && (
-                    <div className="panel compare">
-                        <div className="panel-header">
-                            <div className="panel-meta">
-                                <h3>Comparison</h3>
-                                <p className="hint">Before and after</p>
-                            </div>
+                <div className="panel compare">
+                    <div className="panel-header">
+                        <div className="panel-meta">
+                            <p>Comparison</p>
+                            <h3>Before and After</h3>
                         </div>
-
-                        <div className="compare-stage grid grid-cols-1 md:grid-cols-2 gap-0 min-h-80">
-                            <img
-                                src={project.sourceImage}
-                                alt="Source floor plan"
-                                className="compare-img border-r border-zinc-200"
-                            />
-                            <img
-                                src={currentImage}
-                                alt="Rendered visualization"
-                                className="compare-img"
-                            />
-                        </div>
+                        <div className="hint">Drag to compare</div>
                     </div>
-                )}
-            </div>
+
+                    <div className="compare-stage">
+                        {isClient && project?.sourceImage && currentImage ? (
+                            <ReactCompareSlider
+                                defaultValue={50}
+                                style={{ width: "100%", height: "auto" }}
+                                itemOne={
+                                    <ReactCompareSliderImage
+                                        src={project.sourceImage}
+                                        alt="before"
+                                        className="compare-img"
+                                    />
+                                }
+                                itemTwo={
+                                    <ReactCompareSliderImage
+                                        src={currentImage ?? project.renderedImage ?? undefined}
+                                        alt="after"
+                                        className="compare-img"
+                                    />
+                                }
+                            />
+                        ) : (
+                            <div className="compare-fallback">
+                                {project?.sourceImage && (
+                                    <img
+                                        src={project.sourceImage}
+                                        alt="Before"
+                                        className="compare-img"
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
         </div>
     );
 };
 
-export default VisualizerIdRoute;
+export default VisualizerId;
