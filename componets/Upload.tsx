@@ -4,7 +4,7 @@ import {CheckCircle2, ImageIcon, UploadIcon} from "lucide-react";
 import {PROGRESS_INCREMENT, REDIRECT_DELAY_MS, PROGRESS_INTERVAL_MS} from "../lib/constants";
 
 interface UploadProps {
-    onComplete?: (base64Data: string) => void;
+    onComplete?: (base64Data: string) => Promise<boolean | void> | boolean | void;
 }
 
 const Upload = ({ onComplete }: UploadProps) => {
@@ -53,7 +53,19 @@ const Upload = ({ onComplete }: UploadProps) => {
                             intervalRef.current = null;
                         }
                         timeoutRef.current = setTimeout(() => {
-                            onComplete?.(base64Data);
+                            void (async () => {
+                                try {
+                                    const outcome = await onComplete?.(base64Data);
+                                    if (outcome === false) {
+                                        setFile(null);
+                                        setProgress(0);
+                                    }
+                                } catch (error) {
+                                    console.error("Upload failed:", error);
+                                    setFile(null);
+                                    setProgress(0);
+                                }
+                            })();
                             timeoutRef.current = null;
                         }, REDIRECT_DELAY_MS);
                         return 100;

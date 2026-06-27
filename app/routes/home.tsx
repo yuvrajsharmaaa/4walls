@@ -5,29 +5,7 @@ import Upload from "../../componets/Upload";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createProject, getProjects } from "../../lib/puter.action";
-
-const FEATURED_PROJECTS: DesignItem[] = [
-    {
-        id: "featured-loft",
-        name: "Warm Modern Loft",
-        sourceImage:
-            "https://i.pinimg.com/736x/6c/f5/23/6cf5235987dfa4c2239f0452078fb51c.jpg",
-        renderedImage:
-            "https://i.pinimg.com/736x/6c/f5/23/6cf5235987dfa4c2239f0452078fb51c.jpg",
-        timestamp: Date.now() - 1000 * 60 * 60 * 24 * 5,
-        isFeatured: true,
-    },
-    {
-        id: "featured-lounge",
-        name: "Sunlit Living Room",
-        sourceImage:
-            "https://i.pinimg.com/736x/f9/1a/62/f91a622df97023be4e7b200af7ffd6c3.jpg",
-        renderedImage:
-            "https://i.pinimg.com/736x/f9/1a/62/f91a622df97023be4e7b200af7ffd6c3.jpg",
-        timestamp: Date.now() - 1000 * 60 * 60 * 24 * 12,
-        isFeatured: true,
-    },
-];
+import { FEATURED_PROJECTS } from "../../lib/featured-projects";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -138,7 +116,7 @@ export default function Home() {
                             <p>Supports JPG and PNG formats up to 10MB</p>
                         </div>
 
-                        <Upload onComplete={(base64Data) => { console.log("upload complete: ", base64Data); }} />
+                        <Upload onComplete={handleUploadComplete} />
 
                     </div>
                 </div>

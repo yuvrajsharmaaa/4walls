@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
+    "@heyputer/puter.js": "^2.5.4",
     "@react-router/node": "8.0.0",
     "@react-router/serve": "8.0.0",
     "class-variance-authority": "^0.7.1",
