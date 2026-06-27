@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -55,6 +56,8 @@ const DEFAULT_AUTH_STATE: AuthState = {
 };
 
 export default function App() {
+    const location = useLocation();
+    const isVisualizerRoute = location.pathname.startsWith("/visualizer/");
     const [authState, setAuthState] = useState<AuthState>(DEFAULT_AUTH_STATE);
 
     const refreshAuth = async () => {
@@ -64,7 +67,7 @@ export default function App() {
             setAuthState({
                 isSignedIn: !!user,
                 username: user?.username || null,
-                userId: user?.uuid || null,
+                userId: (user as any)?.id || user?.uuid || null,
             });
 
             return !!user;
@@ -90,12 +93,14 @@ export default function App() {
 
   return (
         <>
-          <Navbar
-            isSignedIn={authState.isSignedIn}
-            username={authState.username}
-            signIn={signIn}
-            signOut={signOut}
-          />
+          {!isVisualizerRoute && (
+            <Navbar
+              isSignedIn={authState.isSignedIn}
+              username={authState.username}
+              signIn={signIn}
+              signOut={signOut}
+            />
+          )}
           <main className="min-h-screen bg-background text-foreground relative z-10">
             <Outlet
               context={{ ...authState, refreshAuth, signIn, signOut }}
