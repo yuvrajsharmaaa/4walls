@@ -54,11 +54,6 @@ const Navbar = ({ isSignedIn, username, signIn, signOut }: NavbarProps) => {
                 <div className="navbar-actions">
                     {isSignedIn ? (
                         <>
-                            
-                            <span className="greetings ml-2">
-                                {username ? `Hi, ${username}!` : "Hi there!"}
-                            </span>
-
                             <Button
                                 variant="secondary"
                                 onClick={handleAuthClick}
@@ -66,6 +61,10 @@ const Navbar = ({ isSignedIn, username, signIn, signOut }: NavbarProps) => {
                             >
                                 Log out
                             </Button>
+
+                            <span className="greetings ml-2">
+                                {username ? `Hi, ${username}!` : "Hi there!"}
+                            </span>
                         </>
                     ) : (
                         <>
@@ -120,10 +119,6 @@ const Navbar = ({ isSignedIn, username, signIn, signOut }: NavbarProps) => {
                 <div className="navbar-mobile-actions">
                     {isSignedIn ? (
                         <>
-                            <span className="greetings ml-2">
-                                {username ? `Hi, ${username}!` : "Hi there!"}
-                            </span>
-
                             <Button
                                 variant="secondary"
                                 onClick={handleAuthClick}
@@ -131,6 +126,10 @@ const Navbar = ({ isSignedIn, username, signIn, signOut }: NavbarProps) => {
                             >
                                 Log out
                             </Button>
+
+                            <span className="greetings ml-2">
+                                {username ? `Hi, ${username}!` : "Hi there!"}
+                            </span>
                         </>
                     ) : (
                         <>

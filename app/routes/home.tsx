@@ -138,7 +138,8 @@ export default function Home() {
                             <p>Supports JPG and PNG formats up to 10MB</p>
                         </div>
 
-                        <Upload onComplete={handleUploadComplete} />
+                        <Upload onComplete={(base64Data) => { console.log("upload complete: ", base64Data); }} />
+
                     </div>
                 </div>
             </section>
@@ -187,7 +188,13 @@ export default function Home() {
                                             <div className="meta">
                                                 <Clock size={12} />
                                                 <span>
-                                                    {new Date(timestamp).toLocaleDateString()}
+                                                    {(() => {
+                                                        const date = new Date(timestamp);
+                                                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(date.getDate()).padStart(2, '0');
+                                                        const year = date.getFullYear();
+                                                        return `${month}/${day}/${year}`;
+                                                    })()}
                                                 </span>
                                                 <span>{isFeatured ? "4Wall Gallery" : "Saved"}</span>
                                             </div>
