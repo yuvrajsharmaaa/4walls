@@ -172,7 +172,7 @@ export default function Home() {
                                     <div className="preview">
                                         <img
                                             src={renderedImage || sourceImage}
-                                            alt={name}
+                                            alt={name ?? ""}
                                             loading="lazy"
                                         />
 
