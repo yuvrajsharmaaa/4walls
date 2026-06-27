@@ -49,7 +49,7 @@ Handles routing, access control, and atomic sharing/unsharing logic.
 
 ---
 
-## 🔒 Security & Access Control Model
+## Security & Access Control Model
 
 To maintain strict security while avoiding backend infrastructure overhead, 4Wall uses a hybrid authentication model:
 
