@@ -138,8 +138,7 @@ export default function Home() {
                             <p>Supports JPG and PNG formats up to 10MB</p>
                         </div>
 
-                        <Upload onComplete={(base64Data) => { console.log("upload complete: ", base64Data); }} />
-
+                                 <Upload onComplete={handleUploadComplete} />
                     </div>
                 </div>
             </section>
